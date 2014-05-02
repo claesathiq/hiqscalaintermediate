@@ -1,13 +1,19 @@
 package com.hiq.scala.intermediate
 
 /**
- * Views
+ * Views bounds
  */
 object Views extends App {
   implicit def strToInt(x: String) = x.toInt
-  val str = "123"
-  println(str.getClass + ": " + str)
-  val y: Int = "123"
-  println(y.getClass + ": " + y)
-  println(Math.max(str, y))
+
+  // Specify a view bound with <%
+  class Container[A <% Int] { def addIt(x: A) = 123 + x }
+
+  val stringCont = (new Container[String]).addIt("123")
+  println(stringCont.getClass + ": " + stringCont)
+
+  val intCont = (new Container[Int]).addIt(123)
+  println(intCont.getClass + ": " + intCont)
+
+  // (new Container[Float]).addIt(123.2F)  // Throws "No implicit view available from Float => Int
 }
