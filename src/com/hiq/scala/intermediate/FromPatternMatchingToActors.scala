@@ -1,14 +1,15 @@
 package com.hiq.scala.intermediate
 
-import akka.actor.{Terminated, Actor, Props}
-import akka.routing.{ActorRefRoutee, Router, RoundRobinRoutingLogic}
+import akka.actor.{Actor, Props}
+import akka.routing.RoundRobinRouter
 
 /**
- * From Pattern Matching to Actors - Actor routing the canonical way
+ * From Pattern Matching to Actors - Actor routing the easy way
  */
 object FromPatternMatchingToActors extends App {
 
   case class Work()
+  case class Result(value: Int)
 
   class Worker extends Actor {
     def receive = {
@@ -17,23 +18,16 @@ object FromPatternMatchingToActors extends App {
   }
 
   class Master extends Actor {
-    var router = {
-      val routees = Vector.fill(5) {
-        val r = context.actorOf(Props[Worker])
-        context watch r
-        ActorRefRoutee(r)
-      }
-      Router(RoundRobinRoutingLogic(), routees)
-    }
+
+    // To specify a supervisor strategy, do
+    // RoundRobinRouter(5).withSupervisorStrategy(yourStrategy)
+    val workerRouter = context.actorOf(Props[Worker].withRouter(RoundRobinRouter(5)), name = "workerRouter")
 
     def receive = {
       case w: Work =>
-        router.route(w, sender())
-      case Terminated(a) =>
-        router = router.removeRoutee(a)
-        val r = context.actorOf(Props[Worker])
-        context watch r
-        router = router.addRoutee(r)
+        for (i <- 0 until 10000) workerRouter ! w
+      case Result(value) =>
+        println("Result is " + value)
     }
   }
 }
