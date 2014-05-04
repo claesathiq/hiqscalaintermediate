@@ -1,36 +1,39 @@
 package com.hiq.scala.intermediate
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{Terminated, Actor, Props}
+import akka.routing.{ActorRefRoutee, Router, RoundRobinRoutingLogic}
 
 /**
- * From Pattern Matching to Actors - Actors refresh
+ * From Pattern Matching to Actors - Actor routing the canonical way
  */
 object FromPatternMatchingToActors extends App {
-  class HelloWorld extends Actor {
+
+  case class Work()
+
+  class Worker extends Actor {
+    def receive = {
+      case w: Work => println("Working...")
+    }
+  }
+
+  class Master extends Actor {
+    var router = {
+      val routees = Vector.fill(5) {
+        val r = context.actorOf(Props[Worker])
+        context watch r
+        ActorRefRoutee(r)
+      }
+      Router(RoundRobinRoutingLogic(), routees)
+    }
 
     def receive = {
-      case Greeter.Done => context.system.shutdown()
-    }
-
-    override def preStart(): Unit = {
-      val greeter = context.actorOf(Props[Greeter], "greeter")
-      greeter ! Greeter.Greet
-    }
-  }
-
-  object Greeter {
-    case object Greet
-    case object Done
-  }
-
-  class Greeter extends Actor {
-    def receive = {
-      case Greeter.Greet =>
-        println("Hello World!")
-        sender ! Greeter.Done
+      case w: Work =>
+        router.route(w, sender())
+      case Terminated(a) =>
+        router = router.removeRoutee(a)
+        val r = context.actorOf(Props[Worker])
+        context watch r
+        router = router.addRoutee(r)
     }
   }
-
-  val system = ActorSystem("actors")
-  system.actorOf(Props[HelloWorld], "helloworld")
 }
