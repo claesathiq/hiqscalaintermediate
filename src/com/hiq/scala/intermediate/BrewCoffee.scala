@@ -1,9 +1,12 @@
 package com.hiq.scala.intermediate
 
-import scala.util.Try
+import scala.util.Random
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
- * Sequential coffee brewing
+ * Future coffee brewing
  */
 object BrewCoffee extends App {
   type CoffeeBeans = String
@@ -14,18 +17,54 @@ object BrewCoffee extends App {
   type Espresso = String
   type Cappuccino = String
 
-  // dummy implementations of the individual steps:
-  def grind(beans: CoffeeBeans): GroundCoffee = s"ground coffee of $beans"
-  def heatWater(water: Water): Water = water.copy(temperature = 85)
-  def frothMilk(milk: Milk): FrothedMilk = s"frothed $milk"
-  def brew(coffee: GroundCoffee, heatedWater: Water): Espresso = "espresso"
+  case class GrindingException(msg: String) extends Exception(msg)
+  case class FrothingException(msg: String) extends Exception(msg)
+  case class WaterBoilingException(msg: String) extends Exception(msg)
+  case class BrewingException(msg: String) extends Exception(msg)
   def combine(espresso: Espresso, frothedMilk: FrothedMilk): Cappuccino = "cappuccino"
 
-  // going through these steps sequentially:
-  def prepareCappuccino(): Try[Cappuccino] = for {
-    ground <- Try(grind("arabica beans"))
-    water <- Try(heatWater(Water(25)))
-    espresso <- Try(brew(ground, water))
-    foam <- Try(frothMilk("milk"))
-  } yield combine(espresso, foam)
+  def grind(beans: CoffeeBeans): Future[GroundCoffee] = Future {
+    println("start grinding...")
+    Thread.sleep(Random.nextInt(2000))
+    if (beans == "baked beans") throw GrindingException("are you joking?")
+    println("finished grinding...")
+    s"ground coffee of $beans"
+  }
+
+  def heatWater(water: Water): Future[Water] = Future {
+    println("heating the water now")
+    Thread.sleep(Random.nextInt(2000))
+    println("hot, it's hot!")
+    water.copy(temperature = 85)
+  }
+
+  def frothMilk(milk: Milk): Future[FrothedMilk] = Future {
+    println("milk frothing system engaged!")
+    Thread.sleep(Random.nextInt(2000))
+    println("shutting down milk frothing system")
+    s"frothed $milk"
+  }
+
+  def brew(coffee: GroundCoffee, heatedWater: Water): Future[Espresso] = Future {
+    println("happy brewing :)")
+    Thread.sleep(Random.nextInt(2000))
+    println("it's brewed!")
+    "espresso"
+  }
+
+  def prepareCappuccino(): Future[Cappuccino] = {
+    val groundCoffee = grind("arabic beans")
+    val heatedWater = heatWater(Water(20))
+    val frothedMilk = frothMilk("milk")
+    for {
+      ground <- groundCoffee
+      water <- heatedWater
+      foam <- frothedMilk
+      espresso <- brew(ground, water)
+    } yield combine(espresso, foam)
+  }
+
+  val cappuccino = prepareCappuccino()
+  Await.ready(cappuccino, 5 seconds)
+  cappuccino.foreach(println)
 }
